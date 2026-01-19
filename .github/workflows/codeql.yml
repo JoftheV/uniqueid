@@ -21,7 +21,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript-typescript' ]
+        # Robust default: covers most small repos
+        language: [ 'javascript-typescript', 'python' ]
 
     steps:
       - name: Checkout repository
