@@ -4,12 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [ "master", "main" ]
-    paths-ignore:
-      - "**/*.md"
   pull_request:
     branches: [ "master", "main" ]
-    paths-ignore:
-      - "**/*.md"
   schedule:
     - cron: '0 3 * * 0'
 
@@ -19,6 +15,7 @@ permissions:
 
 jobs:
   detect:
+    name: Detect CodeQL languages
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.detect.outputs.run }}
@@ -30,6 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           files="$(git ls-files || true)"
+
           langs=()
           echo "$files" | grep -Eiq '\.(js|jsx|ts|tsx)$' && langs+=("javascript-typescript") || true
           echo "$files" | grep -Eiq '\.(py)$' && langs+=("python") || true
@@ -63,6 +61,7 @@ PY
           fi
 
   analyze:
+    name: Analyze
     needs: detect
     if: needs.detect.outputs.run == 'true'
     runs-on: ubuntu-latest
