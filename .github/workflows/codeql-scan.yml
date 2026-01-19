@@ -1,97 +1,14 @@
-name: CodeQL Scan
-# registry-refresh
+name: Dispatch Smoke Test
 
 on:
   workflow_dispatch:
   push:
-    branches: [ "master", "main" ]
-    paths-ignore:
-      - ".github/**"
-      - "**/*.md"
-  pull_request:
-    branches: [ "master", "main" ]
-    paths-ignore:
-      - ".github/**"
-      - "**/*.md"
-  schedule:
-    - cron: '0 3 * * 0'
-
-permissions:
-  contents: read
-  security-events: write
+    branches: [ "master" ]
 
 jobs:
-  detect:
-    name: Detect languages
+  smoke:
     runs-on: ubuntu-latest
-    outputs:
-      run: ${{ steps.detect.outputs.run }}
-      langs: ${{ steps.detect.outputs.langs }}
     steps:
-      - uses: actions/checkout@v4
-      - id: detect
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # List tracked files only (matches what CodeQL sees)
-          files="$(git ls-files || true)"
-
-          # Build language list based on file extensions present
-          langs=()
-
-          echo "$files" | grep -Eiq '\.(js|jsx|ts|tsx)$' && langs+=("javascript-typescript") || true
-          echo "$files" | grep -Eiq '\.(py)$' && langs+=("python") || true
-          echo "$files" | grep -Eiq '\.(go)$' && langs+=("go") || true
-          echo "$files" | grep -Eiq '\.(java|kt)$' && langs+=("java-kotlin") || true
-          echo "$files" | grep -Eiq '\.(cs)$' && langs+=("csharp") || true
-          echo "$files" | grep -Eiq '\.(rb)$' && langs+=("ruby") || true
-          echo "$files" | grep -Eiq '\.(c|cc|cpp|cxx|h|hpp|hh|m|mm)$' && langs+=("cpp") || true
-          echo "$files" | grep -Eiq '\.(swift)$' && langs+=("swift") || true
-
-          # Deduplicate
-          uniq_langs=()
-          for l in "${langs[@]}"; do
-            if [[ ! " ${uniq_langs[*]} " =~ " ${l} " ]]; then
-              uniq_langs+=("$l")
-            fi
-          done
-
-          if [ "${#uniq_langs[@]}" -eq 0 ]; then
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo 'langs=[]' >> "$GITHUB_OUTPUT"
-            echo "No supported CodeQL languages detected in repo; skipping."
-          else
-            python3 - <<'PY' "${uniq_langs[@]}" >> "$GITHUB_OUTPUT"
-import json, sys
-langs = sys.argv[1:]
-print("run=true")
-print("langs=" + json.dumps(langs))
-PY
-            echo "Detected CodeQL languages: ${uniq_langs[*]}"
-          fi
-
-  analyze:
-    name: Analyze
-    needs: detect
-    if: needs.detect.outputs.run == 'true'
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language: ${{ fromJson(needs.detect.outputs.langs) }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+      - run: |
+          echo "dispatch ok"
+          date
