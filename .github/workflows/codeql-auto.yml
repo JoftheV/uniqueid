@@ -1,4 +1,4 @@
-name: CodeQL Scan
+name: CodeQL Auto
 
 on:
   workflow_dispatch:
@@ -19,7 +19,6 @@ permissions:
 
 jobs:
   detect:
-    name: Detect languages
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.detect.outputs.run }}
@@ -49,7 +48,11 @@ jobs:
           if [ "${#uniq[@]}" -eq 0 ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
             echo 'langs=[]' >> "$GITHUB_OUTPUT"
-            echo "No supported CodeQL languages detected; skipping."
+            {
+              echo "### CodeQL"
+              echo "- Status: **Skipped**"
+              echo "- Reason: No CodeQL-supported source files found"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
             python3 - <<'PY' "${uniq[@]}" >> "$GITHUB_OUTPUT"
 import json, sys
@@ -57,11 +60,9 @@ langs = sys.argv[1:]
 print("run=true")
 print("langs=" + json.dumps(langs))
 PY
-            echo "Detected: ${uniq[*]}"
           fi
 
   analyze:
-    name: Analyze
     needs: detect
     if: needs.detect.outputs.run == 'true'
     runs-on: ubuntu-latest

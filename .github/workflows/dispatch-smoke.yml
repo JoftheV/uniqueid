@@ -1,0 +1,18 @@
+name: Dispatch Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master", "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "dispatch ok"
+          uname -a
+          date
