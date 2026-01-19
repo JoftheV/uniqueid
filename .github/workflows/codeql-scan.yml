@@ -1,14 +1,78 @@
-name: Dispatch Smoke Test
+name: CodeQL Scan
 
 on:
   workflow_dispatch:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
+    paths-ignore:
+      - "**/*.md"
+  pull_request:
+    branches: [ "master", "main" ]
+    paths-ignore:
+      - "**/*.md"
+  schedule:
+    - cron: '0 3 * * 0'
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
-  smoke:
+  detect:
+    name: Detect languages
     runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.detect.outputs.run }}
+      langs: ${{ steps.detect.outputs.langs }}
     steps:
-      - run: |
-          echo "dispatch ok"
-          date
+      - uses: actions/checkout@v4
+      - id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$(git ls-files || true)"
+          langs=()
+          echo "$files" | grep -Eiq '\.(js|jsx|ts|tsx)$' && langs+=("javascript-typescript") || true
+          echo "$files" | grep -Eiq '\.(py)$' && langs+=("python") || true
+          echo "$files" | grep -Eiq '\.(go)$' && langs+=("go") || true
+          echo "$files" | grep -Eiq '\.(java|kt)$' && langs+=("java-kotlin") || true
+          echo "$files" | grep -Eiq '\.(cs)$' && langs+=("csharp") || true
+          echo "$files" | grep -Eiq '\.(rb)$' && langs+=("ruby") || true
+          echo "$files" | grep -Eiq '\.(c|cc|cpp|cxx|h|hpp|hh|m|mm)$' && langs+=("cpp") || true
+          echo "$files" | grep -Eiq '\.(swift)$' && langs+=("swift") || true
+
+          uniq=()
+          for l in "${langs[@]}"; do
+            [[ " ${uniq[*]} " =~ " ${l} " ]] || uniq+=("$l")
+          done
+
+          if [ "${#uniq[@]}" -eq 0 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo 'langs=[]' >> "$GITHUB_OUTPUT"
+            echo "No supported CodeQL languages detected; skipping."
+          else
+            python3 - <<'PY' "${uniq[@]}" >> "$GITHUB_OUTPUT"
+import json, sys
+langs = sys.argv[1:]
+print("run=true")
+print("langs=" + json.dumps(langs))
+PY
+            echo "Detected: ${uniq[*]}"
+          fi
+
+  analyze:
+    name: Analyze
+    needs: detect
+    if: needs.detect.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJson(needs.detect.outputs.langs) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/analyze@v4
