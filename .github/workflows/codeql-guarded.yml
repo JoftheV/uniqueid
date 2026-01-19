@@ -1,0 +1,78 @@
+name: CodeQL Guarded
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  detect:
+    name: Detect supported code
+    runs-on: ubuntu-latest
+    outputs:
+      js: ${{ steps.filter.outputs.js }}
+      py: ${{ steps.filter.outputs.py }}
+      any: ${{ steps.filter.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            js:
+              - '**/*.js'
+              - '**/*.jsx'
+              - '**/*.ts'
+              - '**/*.tsx'
+            py:
+              - '**/*.py'
+            any:
+              - '**/*.js'
+              - '**/*.jsx'
+              - '**/*.ts'
+              - '**/*.tsx'
+              - '**/*.py'
+
+      - name: Summary
+        run: |
+          echo "### CodeQL Guarded" >> "$GITHUB_STEP_SUMMARY"
+          echo "- JS/TS detected: **${{ steps.filter.outputs.js }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Python detected: **${{ steps.filter.outputs.py }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Any supported code detected: **${{ steps.filter.outputs.any }}**" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.filter.outputs.any }}" != "true" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Skipped** (no CodeQL-supported source files found)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  codeql_js:
+    name: CodeQL (JS/TS)
+    needs: detect
+    if: needs.detect.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/analyze@v4
+
+  codeql_py:
+    name: CodeQL (Python)
+    needs: detect
+    if: needs.detect.outputs.py == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: python
+      - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/analyze@v4
