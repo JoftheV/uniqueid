@@ -16,6 +16,26 @@ jobs:
     environment: staging
 
     steps:
+      - name: Install cloudflared
+        run: |
+          set -euo pipefail
+          sudo curl -fsSL -o /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          sudo chmod +x /usr/local/bin/cloudflared
+
+      - name: Deploy via Cloudflare Access TCP (SSH)
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          SSH_HOSTNAME: ${{ vars.SSH_HOSTNAME }}
+          SSH_USER: ${{ vars.SSH_USER }}
+        run: |
+          set -euo pipefail
+          cloudflared access tcp --hostname "${SSH_HOSTNAME}" --url 127.0.0.1:2222 --id "${CF_ACCESS_CLIENT_ID}" --secret "${CF_ACCESS_CLIENT_SECRET}" >/dev/null 2>&1 &
+          CF_PID=$!
+          trap "kill ${CF_PID} >/dev/null 2>&1 || true" EXIT
+          for i in {1..60}; do nc -z 127.0.0.1 2222 && break; sleep 0.15; done
+          nc -z 127.0.0.1 2222
+          ssh -p 2222 -o StrictHostKeyChecking=no "${SSH_USER}@127.0.0.1" "cd /opt/uniqueid && docker compose pull && docker compose up -d && docker image prune -af --filter 'until=168h' || true"
       - uses: actions/checkout@v4
 
       - name: Login to GHCR
